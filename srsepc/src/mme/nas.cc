@@ -1093,6 +1093,9 @@ bool nas::handle_attach_complete(srsran::byte_buffer_t* nas_rx)
     m_logger.info("Sending EMM Information");
   }
   m_emm_ctx.state = EMM_STATE_REGISTERED;
+  srsran::console("DANIEL: Sending Paging %" PRIu64 " %d\n", m_emm_ctx.imsi, act_bearer.eps_bearer_id);
+  s1ap_paging::get_instance()->send_paging(m_emm_ctx.imsi, act_bearer.eps_bearer_id);
+  srsran::console("DANIEL: Sending Paging - Done\n");
   return true;
 }
 

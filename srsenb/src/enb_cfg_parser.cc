@@ -1517,6 +1517,55 @@ int parse_sib9(std::string filename, sib_type9_s* data)
   }
 }
 
+int parse_sib11(std::string filename, sib_type11_s* data)
+{
+
+  parser::section sib11("sib11");
+
+  std::string message;
+  uint8_t data_coding_scheme;
+
+  sib11.add_field(make_asn1_bitstring_number_parser("msg_id", &data->msg_id));
+  sib11.add_field(make_asn1_bitstring_number_parser("serial_num", &data->serial_num));
+  sib11.add_field(make_asn1_enum_str_parser("warning_msg_segment_type", &data->warning_msg_segment_type));
+  sib11.add_field(new parser::field<uint8_t>("warning_msg_segment_num", &data->warning_msg_segment_num));
+
+  sib11.add_field(new parser::field<std::string>("warning_msg_segment", &message));
+  //  data->warning_msg_segment.resize(message.length());
+  //data->warning_msg_segment = data->warning_msg_segment.from_string("C576597E2EBBC7F950A8");
+  data->warning_msg_segment = data->warning_msg_segment.from_string("02C576597E2EBBC7F950A8D168341A8D46A3D168341A8D46A3D168341A8D46A3D168341A8D46A3D168341A8D46A3D168341A8D46A3D168341A8D46A3D168341A8D46A3D168341A8D46A3D168341A8D46A3D1000A");
+  // memcpy(data->warning_msg_segment.data(), message.c_str(), data->warning_msg_segment.size());
+  
+  sib11.add_field(new parser::field<uint8_t>("data_coding_scheme", &data_coding_scheme));
+  data->data_coding_scheme_present = true;
+  data->data_coding_scheme = data->data_coding_scheme.from_number(data_coding_scheme);
+  return parser::parse_section(std::move(filename), &sib11);
+}
+
+int parse_sib12(std::string filename, sib_type12_r9_s* data)
+{
+
+  parser::section sib12("sib12");
+
+  std::string message;
+  uint8_t data_coding_scheme_r9;
+
+  sib12.add_field(make_asn1_bitstring_number_parser("msg_id", &data->msg_id_r9));
+  sib12.add_field(make_asn1_bitstring_number_parser("serial_num", &data->serial_num_r9));
+  sib12.add_field(make_asn1_enum_str_parser("warning_msg_segment_type", &data->warning_msg_segment_type_r9));
+  sib12.add_field(new parser::field<uint8_t>("warning_msg_segment_num", &data->warning_msg_segment_num_r9));
+
+  sib12.add_field(new parser::field<std::string>("warning_msg_segment", &message));
+  //  data->warning_msg_segment.resize(message.length());
+  data->warning_msg_segment_r9 = data->warning_msg_segment_r9.from_string("02C576597E2EBBC7F950A8D168341A8D46A3D168341A8D46A3D168341A8D46A3D168341A8D46A3D168341A8D46A3D168341A8D46A3D168341A8D46A3D168341A8D46A3D168341A8D46A3D168341A8D46A3D1000A");
+  // memcpy(data->warning_msg_segment.data(), message.c_str(), data->warning_msg_segment.size());
+  
+  sib12.add_field(new parser::field<uint8_t>("data_coding_scheme", &data_coding_scheme_r9));
+  data->data_coding_scheme_r9_present = true;
+  data->data_coding_scheme_r9 = data->data_coding_scheme_r9.from_number(data_coding_scheme_r9);
+  return parser::parse_section(std::move(filename), &sib12);
+}
+
 int parse_sib13(std::string filename, sib_type13_r9_s* data)
 {
   parser::section sib13("sib13");
@@ -1548,6 +1597,8 @@ int parse_sibs(all_args_t* args_, rrc_cfg_t* rrc_cfg_, srsenb::phy_cfg_t* phy_co
   sib_type4_s*     sib4  = &rrc_cfg_->sibs[3].set_sib4();
   sib_type7_s*     sib7  = &rrc_cfg_->sibs[6].set_sib7();
   sib_type9_s*     sib9  = &rrc_cfg_->sibs[8].set_sib9();
+  sib_type11_s*    sib11 = &rrc_cfg_->sibs[10].set_sib11();
+  sib_type12_r9_s* sib12 = &rrc_cfg_->sibs[11].set_sib12_v920();
   sib_type13_r9_s* sib13 = &rrc_cfg_->sibs[12].set_sib13_v920();
 
   sib_type1_s* sib1 = &rrc_cfg_->sib1;
@@ -1628,6 +1679,20 @@ int parse_sibs(all_args_t* args_, rrc_cfg_t* rrc_cfg_, srsenb::phy_cfg_t* phy_co
       return SRSRAN_ERROR;
     }
   }
+
+  // Generate SIB11 if defined in mapping info
+  if (sib_is_present(sib1->sched_info_list, sib_type_e::sib_type11)) {
+    if (sib_sections::parse_sib11(args_->enb_files.sib_config, sib11) != SRSRAN_SUCCESS) {
+      return SRSRAN_ERROR;
+    }
+  }
+
+  if (sib_is_present(sib1->sched_info_list, sib_type_e::sib_type12_v920)) {
+    if (sib_sections::parse_sib12(args_->enb_files.sib_config, sib12) != SRSRAN_SUCCESS) {
+      return SRSRAN_ERROR;
+    }
+  }
+
 
   if (sib_is_present(sib1->sched_info_list, sib_type_e::sib_type13_v920)) {
     if (sib_sections::parse_sib13(args_->enb_files.sib_config, sib13) != SRSRAN_SUCCESS) {

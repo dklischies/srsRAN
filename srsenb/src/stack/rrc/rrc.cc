@@ -513,6 +513,21 @@ bool rrc::is_paging_opportunity(uint32_t tti, uint32_t* payload_len)
   uint32_t Ns  = Nb / T > 1 ? Nb / T : 1;
   uint32_t sfn = tti / 10;
 
+  bool etws_ind = false;
+  bool cmas_ind = false;
+
+  for (auto schedules : cfg.sib1.sched_info_list) {
+    asn1::rrc::sib_map_info_l schedule = schedules.sib_map_info;
+    for (auto sib_type : schedule) {
+      if (sib_type == asn1::rrc::sib_type_e::sib_type11) {
+        etws_ind = true;
+      } else if (sib_type == asn1::rrc::sib_type_e::sib_type12_v920) {
+        cmas_ind = true;
+      }
+    }
+  }
+
+
   std::vector<uint32_t> ue_to_remove;
 
   {
@@ -538,8 +553,22 @@ bool rrc::is_paging_opportunity(uint32_t tti, uint32_t* payload_len)
       }
 
       if ((uint32_t)sf_idx == (tti % 10)) {
-        paging_rec->paging_record_list_present = true;
-        paging_rec->paging_record_list.push_back(u);
+        paging_rec->etws_ind_present = etws_ind;
+        
+        if (cmas_ind) {
+          paging_rec->non_crit_ext_present = true;
+          paging_rec->non_crit_ext.non_crit_ext_present = true;
+          paging_rec->non_crit_ext.non_crit_ext.cmas_ind_r9_present = true;
+        }
+
+        if (!(etws_ind || cmas_ind)) {
+          paging_rec->paging_record_list_present = true;
+          paging_rec->paging_record_list.push_back(u);
+        } else {
+          paging_rec->paging_record_list_present = false;
+          paging_rec->sys_info_mod_present = true;
+        }
+
         ue_to_remove.push_back(ueid);
         n++;
         logger.info("Assembled paging for ue_id=%d, tti=%d", ueid, tti);
@@ -551,7 +580,7 @@ bool rrc::is_paging_opportunity(uint32_t tti, uint32_t* payload_len)
     }
   }
 
-  if (paging_rec->paging_record_list.size() > 0) {
+  if (paging_rec->etws_ind_present || paging_rec->non_crit_ext_present || paging_rec->paging_record_list.size() > 0) {
     byte_buf_paging.clear();
     asn1::bit_ref bref(byte_buf_paging.msg, byte_buf_paging.get_tailroom());
     if (pcch_msg.pack(bref) == asn1::SRSASN_ERROR_ENCODE_FAIL) {
@@ -821,7 +850,19 @@ uint32_t rrc::generate_sibs()
 
       // Add other SIBs to this message, if any
       for (auto& mapping_enum : sched_info[sched_info_elem].sib_map_info) {
-        sib_list.push_back(cfg.sibs[(int)mapping_enum + 2]);
+        if (mapping_enum == asn1::rrc::sib_type_e::sib_type12_v920) {
+          auto sib12_1 = cfg.sibs[(int)mapping_enum + 2];
+          auto sib12_2 = cfg.sibs[(int)mapping_enum + 2];
+          sib12_1.sib12_v920().warning_msg_segment_type_r9 = asn1::rrc::sib_type12_r9_s::warning_msg_segment_type_r9_opts::not_last_segment;
+          
+          sib12_2.sib12_v920().warning_msg_segment_num_r9 = 0;
+          sib12_2.sib12_v920().warning_msg_segment_r9 = sib12_2.sib12_v920().warning_msg_segment_r9.from_string("01C276597E2EBBC7F950A8D168341A8D46A3D168341A8D46A3D168341A8D46A3D168341A8D46A3D168341A8D46A3D168341A8D46A3D168341A8D46A3D168341A8D46A3D168341A8D46A3D168341A8D46A3D1000A");
+          
+          // sib_list.push_back(sib12_1);
+          sib_list.push_back(sib12_2);
+        } else {
+          sib_list.push_back(cfg.sibs[(int)mapping_enum + 2]);
+        }
       }
     }
 
